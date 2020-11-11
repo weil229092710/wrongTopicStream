@@ -2,6 +2,7 @@ package com.xuehai.utils
 
 import java.sql.{Connection, PreparedStatement, ResultSet}
 import java.text.SimpleDateFormat
+import java.util
 import java.util.Locale
 
 import com.alibaba.fastjson.{JSON, JSONObject}
@@ -22,10 +23,11 @@ import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer010
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 
 
-object QingzhouMain extends Constants{
+object AllMain extends Constants{
 
   def main(args: Array[String]) {
     taskmain()
@@ -38,8 +40,8 @@ object QingzhouMain extends Constants{
     //env.getCheckpointConfig.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE)
     //env.getCheckpointConfig.setFailOnCheckpointingErrors(false)
     //env.getCheckpointConfig.enableExternalizedCheckpoints(ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION)
-    env.setRestartStrategy(RestartStrategies.fixedDelayRestart(10, Time.of(1, TimeUnit.MINUTES)))//设置重启策略，job失败后，每隔10分钟重启一次，尝试重启100次
-    val quUserInfoSql="select a.iUserId,a.iSchoolId,a.sUserName,a.iUserType,b.sSchoolName,b.scountyname  from \nxh_user_service.XHSys_User a\nLEFT JOIN \nxh_user_service.XHSchool_Info b \non  a.iSchoolId=b.ischoolid and b.bdelete=0 and b.istatus in (1,2)"
+    env.setRestartStrategy(RestartStrategies.fixedDelayRestart(50, Time.of(1, TimeUnit.MINUTES)))//设置重启策略，job失败后，每隔10分钟重启一次，尝试重启100次
+    val quUserInfoSql="select a.iUserId,a.iSchoolId,a.sUserName,a.iUserType,b.sSchoolName,b.scountyname,b.sProvinceName,b.sCityName  from \nxh_user_service.XHSys_User a\nLEFT JOIN \nxh_user_service.XHSchool_Info b \non  a.iSchoolId=b.ischoolid and b.bdelete=0 and b.istatus in (1,2)"
     var emptyMap = new mutable.HashMap[Int,JSON]()
     val results: ResultSet = MysqlUtils.select(quUserInfoSql)
 
@@ -53,11 +55,14 @@ object QingzhouMain extends Constants{
       json.put("user_type",results.getInt(4))
       json.put("school_name",results.getString(5))
       json.put("city",results.getString(6))
+      json.put("province",results.getString(7))
+      json.put("city_name",results.getString(8))
+
       emptyMap+=(user_id -> json)
     }
     // 用相对路径定义数据源
     //val resource = getClass.getResource("/hello.txt")
-    // val dataStream = env.readTextFile(resource.getPath)
+     //val dataStream = env.readTextFile(resource.getPath)
     val kafkaConsumer: FlinkKafkaConsumer010[String] = new FlinkKafkaConsumer010[String](topic, new SimpleStringSchema(), props)
     env.addSource(kafkaConsumer)
       .filter(x=>{
@@ -87,6 +92,9 @@ object QingzhouMain extends Constants{
           val scountyName=JSON.parseObject(emptyMap(userid.toInt).toString ).get("city").toString
           val userType=JSON.parseObject(emptyMap(userid.toInt).toString ).get("user_type").toString
           val userName=JSON.parseObject(emptyMap(userid.toInt).toString ).get("user_name").toString
+          val province=JSON.parseObject(emptyMap(userid.toInt).toString ).get("province").toString
+          val cityName=JSON.parseObject(emptyMap(userid.toInt).toString ).get("city_name").toString
+
           val time_local=json.getString("time_local")
           //val time=Utils.toLoclTime(time_local)
           val sdf1 = new SimpleDateFormat("dd/MMM/yyyy:hh:mm:ss Z", Locale.ENGLISH)
@@ -99,30 +107,30 @@ object QingzhouMain extends Constants{
 
           val timeStamp = System.currentTimeMillis();
 
-          task1(userid,userName,school_id,school_name,scountyName,hour.toString,time,userType,request,appName,method,timeStamp)
+          task1(userid,userName,school_id,school_name,scountyName,hour.toString,time,userType,request,appName,method,timeStamp,province,cityName)
         }
         catch {
           case e: Exception => {
             //Utils.dingDingRobot("all", "错题本实时数据异常：%s, %s".format(e, x))
             log.error("数据异常：%s, \\r\\n %s".format(e, x))
-            task1("","","","","","","","","","","",0)
+            task1("","","","","","","","","","","",0,"","")
           }
         }
       })
       .filter(_.userType!="")
-      .filter(_.city=="青州市")   //只保存青州市的数据
+      //.filter(_.city=="青州市")   //只保存青州市的数据
       .filter(_.school_name!="")
 
       .assignAscendingTimestamps(_.timestap*1000)
 
-      .timeWindowAll(org.apache.flink.streaming.api.windowing.time.Time.seconds(20))
+      .timeWindowAll(org.apache.flink.streaming.api.windowing.time.Time.seconds(4000))
 
       .apply(new ByWindow())
       .addSink(new  MySqlSink2())
 
     // .print()
 
-    env.execute("qingzhou job")
+    env.execute("all_active_num")
   }
 }
 
@@ -130,12 +138,15 @@ class ByWindow() extends AllWindowFunction[task1, Iterable[task1], TimeWindow]{
   override def apply(window: TimeWindow, input: Iterable[task1], out: Collector[Iterable[task1]]): Unit = {
 
 
-    if(input.nonEmpty) {
-      // System.out.println("1 秒内收集到 接口的条数是：" + input.size)
-      out.collect(input)
-    }
 
-  }
+    if(input.nonEmpty) {
+          // System.out.println("1 秒内收集到 接口的条数是：" + input.size)
+          out.collect(input)
+        }
+
+
+      }
+
 }
 
 
@@ -150,7 +161,9 @@ case class task1(userid: String,
                  request:String,
                  appName:String,
                  method:String,
-                 timestap:Long
+                 timestap:Long,
+                 province:String,
+                 city_name:String
                 )
 
 case class userInfo(userid: Int,
@@ -162,8 +175,8 @@ case class userInfo(userid: Int,
                    )
 
 
+case class active(schoolId: String, school_name: String, time: String, userType: String,count:Int)
 
-case class UserBehavior( userId: Long, itemId: Long, categoryId: Int, behavior: String, timestamp: Long )
 
 
 class MySqlSink2() extends RichSinkFunction[Iterable[task1]] with Constants {
@@ -174,6 +187,8 @@ class MySqlSink2() extends RichSinkFunction[Iterable[task1]] with Constants {
   var result: ResultSet = null
   var updateStmt: PreparedStatement = _
   var status = ""
+  val collectMap = new mutable.HashMap[String,Int]()
+  val Map = new mutable.HashMap[String,String]()
   import org.apache.commons.dbcp2.BasicDataSource
 
   var dataSource: BasicDataSource = null
@@ -190,10 +205,9 @@ class MySqlSink2() extends RichSinkFunction[Iterable[task1]] with Constants {
       conn = getConnection(dataSource)
       conn.setAutoCommit(false) // 开始事务
 
-      insertStmt = conn.prepareStatement("INSERT INTO real_class_copy (user_id, user_name,status,time,school_name,school_id,user_type) VALUES (?,?,?,?,?,?,?)")
-      // insertStmtStu=conn.prepareStatement("INSERT INTO active_student_num_copy (school_id, school_name,hour,time,count,user_type) VALUES (?,?,?,?,?,?) on duplicate key update count=count+1,time=?")
-      insertStmtStu=conn.prepareStatement("INSERT INTO active_student_num (school_id, school_name,hour,time,count,user_type,cur_date) VALUES (?,?,?,?,?,?,?) on duplicate key update count=count+1,time=?")
-
+      insertStmt = conn.prepareStatement("INSERT INTO all_real_class_copy (user_id, user_name,status,time,school_name,school_id,user_type) VALUES (?,?,?,?,?,?,?)")
+       insertStmtStu=conn.prepareStatement("INSERT INTO all_active_num (school_id, school_name,count,user_type,time,cur_date,province,city) VALUES (?,?,?,?,?,?,?,?) on duplicate key update count=count+?,time=?")
+      //insertStmtStu=conn.prepareStatement("INSERT INTO active_student_num (school_id, school_name,hour,time,count,user_type,cur_date) VALUES (?,?,?,?,?,?,?) on duplicate key update count=count+1,time=?")
     }
     catch {
       case e: Exception => {
@@ -207,16 +221,15 @@ class MySqlSink2() extends RichSinkFunction[Iterable[task1]] with Constants {
     try{
       for(value <-values) {
 
-        insertStmtStu.setString(1, value.school_id)
-        insertStmtStu.setString(2, value.school_name)
-        insertStmtStu.setString(3, value.hour)
-        insertStmtStu.setString(4, value.time)
-        insertStmtStu.setInt(5, 1)
-        insertStmtStu.setInt(6, value.userType.toInt)
-        insertStmtStu.setString(7, value.time.split(" ")(0))
-        insertStmtStu.setString(8, value.time)
-        insertStmtStu.addBatch()
+        if (collectMap.contains(value.school_id+"*"+value.userType)) { //若map中已经存在
+            val maybeInt: Option[Int] = collectMap.get(value.school_id+"*"+value.userType)
 
+            collectMap.put(value.school_id+"*"+value.userType, maybeInt.get + 1)
+          }
+          else {
+            collectMap.put(value.school_id+"*"+value.userType, 1)
+            Map.put(value.school_id+"*"+value.userType , value.school_name +"#"+ value.time+"#"+ value.province+"#"+ value.city_name)
+          }
         //互动任务
         if (value.request.contains("/selector/tasks/")&&value.appName=="com.xh.smartclassstu") {
           status = "提交课堂任务"
@@ -273,8 +286,26 @@ class MySqlSink2() extends RichSinkFunction[Iterable[task1]] with Constants {
           insertStmt.addBatch()
         }
         status=""
+
+      }
+      for ((key, value) <- Map) {
+        //println("key is" + key + " ,value is" + value)
+        insertStmtStu.setString(1, key.split("\\*")(0))
+        insertStmtStu.setString(2, value.split("#")(0))
+
+        insertStmtStu.setInt(3, collectMap.get(key).get)
+        insertStmtStu.setString(4, key.split("\\*")(1))
+        insertStmtStu.setString(5, value.split("#")(1))
+        insertStmtStu.setString(6, value.split("#")(1).split(" ")(0))
+        insertStmtStu.setString(7, value.split("#")(2))
+        insertStmtStu.setString(8, value.split("#")(3))
+        insertStmtStu.setInt(9, collectMap.get(key).get*2)
+        insertStmtStu.setString(10, value.split("#")(1))
+        insertStmtStu.addBatch()
       }
 
+      Map.clear()
+      collectMap.clear()
       val count1 = insertStmtStu.executeBatch //批量后执行
       val count2 = insertStmt.executeBatch //批量后执行
 
