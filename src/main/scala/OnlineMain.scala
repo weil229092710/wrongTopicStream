@@ -36,10 +36,10 @@ object OnlineMain extends Constants {
 	def onlineData(): Unit ={
 		val env = StreamExecutionEnvironment.getExecutionEnvironment
 		env.enableCheckpointing(10 * 1000)//开启checkPoint，并且每分钟做一次checkPoint保存
-		env.setStateBackend(new FsStateBackend(checkPointPath))
-		env.getCheckpointConfig.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE)
-		env.getCheckpointConfig.setFailOnCheckpointingErrors(false)
-		env.getCheckpointConfig.enableExternalizedCheckpoints(ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION)
+//		env.setStateBackend(new FsStateBackend(checkPointPath))
+//		env.getCheckpointConfig.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE)
+//		env.getCheckpointConfig.setFailOnCheckpointingErrors(false)
+//		env.getCheckpointConfig.enableExternalizedCheckpoints(ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION)
 		env.setRestartStrategy(RestartStrategies.fixedDelayRestart(100, Time.of(1, TimeUnit.MINUTES)))//设置重启策略，job失败后，每隔1分钟重启一次，尝试重启100次
 		val kafkaConsumer: FlinkKafkaConsumer010[String] = new FlinkKafkaConsumer010[String](onlinetopic, new SimpleStringSchema(), props)
 		env.addSource(kafkaConsumer)
@@ -52,8 +52,8 @@ object OnlineMain extends Constants {
 						println(x)
 						val bb=x.split("\\s+")
 						val time=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date)
-						val clientid=bb(8)
-						val online=bb(10).split(",")(0).replace("\"","")
+						val clientid=bb(9)
+						val online=bb(11).split(",")(0).replace("\"","")
 						//val sql="select sSchoolName from XHSchool_Info where scountyname='青州市' and bdelete=0 and istatus in (1,2) and ischoolid="+school_id
             val quUseridAndDeviceSql="select userId,deviceId from xh_user_service.XHUsers_Clients WHERE clientId='"+clientid+"' limit 1"
 						val results: ResultSet = MysqlUtils.select(quUseridAndDeviceSql)
@@ -104,9 +104,9 @@ object OnlineMain extends Constants {
 				})
 
 
-  		.filter(_.city=="青州市")
+  		//.filter(_.city=="青州市")
   		.filter(_.school_id!="")
-  		.filter(_.userType=="1")
+  		//.filter(_.userType=="1")
 
 
 			.addSink(new  MyJdbcSink())
@@ -132,7 +132,7 @@ class MyJdbcSink() extends RichSinkFunction[OnlineCount] with Constants{
 		try {
 			Class.forName("com.mysql.jdbc.Driver")
 			conn = DriverManager.getConnection(Url, User, Password)
-			insertStmt = conn.prepareStatement("INSERT INTO online_num (school_id, school_name,time,num) VALUES (?,?,?,?) on duplicate key update num=case when num+? <0 then 0 else num+? end,time=?")
+			insertStmt = conn.prepareStatement("INSERT INTO online_num (school_id, school_name,time,num,user_type) VALUES (?,?,?,?,?) on duplicate key update num=case when num+? <0 then 0 else num+? end,time=?")
 
 		}
 		catch {
@@ -154,10 +154,11 @@ class MyJdbcSink() extends RichSinkFunction[OnlineCount] with Constants{
 			insertStmt.setString(2, value.school_name)
 			insertStmt.setString(3, value.time)
 			insertStmt.setInt(4, num1)
-			insertStmt.setInt(5,value.num)
+			insertStmt.setInt(5, value.userType.toInt)
 			insertStmt.setInt(6,value.num)
+			insertStmt.setInt(7,value.num)
 
-			insertStmt.setString(7, value.time)
+			insertStmt.setString(8, value.time)
 
 			insertStmt.execute()
 
