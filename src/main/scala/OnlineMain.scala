@@ -160,6 +160,7 @@ class MyJdbcSink() extends RichSinkFunction[OnlineCount] with Constants{
 
 			insertStmt.setString(8, value.time)
 
+
 			insertStmt.execute()
 
 		}

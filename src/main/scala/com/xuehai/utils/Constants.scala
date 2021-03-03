@@ -1,7 +1,10 @@
 package com.xuehai.utils
 
 import java.util.Properties
-import org.slf4j.{LoggerFactory, Logger}
+
+import org.slf4j.{Logger, LoggerFactory}
+
+import scala.collection.mutable
 
 /**
   * Created by root on 2019/11/13.
@@ -20,7 +23,7 @@ trait Constants {
 	val groupId = PropertiesUtil.getKey("kafkaGroupId")
 	val props = new Properties()
 	props.put("bootstrap.servers", brokerList)
-	props.put("auto.offset.reset", "latest")//earliest
+	props.put("auto.offset.reset", "earliest")//earliest   latest
 	props.put("group.id", groupId)
 	props.put("enable.auto.commit", "false")
 	props.put("auto.commit.interval.ms", "1000")
@@ -74,4 +77,38 @@ trait Constants {
 	  * 任务名称
 	  */
 	val jobName = PropertiesUtil.getKey("jobName")
+
+
+	val appNameMap = new mutable.HashMap[String, String]()
+	appNameMap+=("com.xh.alsstu" ->"智通云听说")
+	appNameMap+=("com.xh.alstch"-> "智通云听说")
+	appNameMap+=("com.xh.aklestu"  -> "智通课堂3.x")
+	appNameMap+=("com.xh.akletch"  -> "智通课堂3.x")
+	appNameMap+=("com.xuehai.launcher" -> "智通平台")
+	appNameMap+=("com.xuehai.response_launcher_teacher" ->"智通平台")
+	appNameMap+=("com.xh.acldtch"-> "云作业")
+	appNameMap+=("com.xh.acldstu"-> "云作业")
+	appNameMap+=("com.xh.smartclassstu" -> "云课堂")
+	appNameMap+=("com.xh.smartclasstch"  -> "云课堂")
+	appNameMap+=("com.xh.areadunc" -> "悦读")
+	appNameMap+=("com.xh.abrustu" ->"学海题舟")
+	appNameMap+=("com.xh.abrutch"  ->"学海题舟")
+	appNameMap+=("com.xh.ime" -> "学海输入法")
+	appNameMap+=("com.xh.arespunc" -> "响应")
+	appNameMap+=("com.xh.acbktch" ->"语文基础知识")
+	appNameMap+=("com.xh.aartunc"  ->"美文与写作")
+	appNameMap+=("com.zhitongyun.oetStudent"-> "口语训练")
+	appNameMap+=("com.zhitongyun.oetteacher" -> "口语训练")
+	appNameMap+=( "com.xh.feedback" -> "反馈")
+	appNameMap+=("com.fen.afmtch"  -> "云辅导")
+	appNameMap+=("com.fen.afmstu"  -> "云辅导")
+	appNameMap+=("com.xh.ascstu" -> "联云课")
+	appNameMap+=("com.xh.asctch" -> "联云课")
+	appNameMap+=("com.xh.assist"-> "网络检查工具")
+	appNameMap+=("com.xuehai.cwpmaker" -> "录课宝")
+	appNameMap+=("com.xuehai.cwpplayer"-> "播放器")
+
+
+
+
 }

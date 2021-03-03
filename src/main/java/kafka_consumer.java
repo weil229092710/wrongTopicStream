@@ -18,8 +18,8 @@ public class kafka_consumer {
     public static void kafka_consumer(){
         Properties props = new Properties();
         props.put("bootstrap.servers", brokerList);
-        props.put("auto.offset.reset", "earliest");
-        props.put("group.id", "test-consumer-group1");
+        props.put("auto.offset.reset", "latest");
+        props.put("group.id", "test-consumer-group2");
         props.put("enable.auto.commit", "false");
         props.put("auto.commit.interval.ms", "1000");
         props.put("max.poll.records", 3);

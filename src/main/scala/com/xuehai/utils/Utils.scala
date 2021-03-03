@@ -53,6 +53,35 @@ object Utils extends Constants{
         dateStr(0)
     }
 
+
+
+  /**
+    * null 转0，计算kafka的offset使用
+    *
+    * @param x
+    * @return
+    */
+  def null20(x: Any): Int ={
+    if(x == null) return 0
+    else x.toString.toInt
+  }
+  def str2hour(x: Long): String ={
+    import java.text.SimpleDateFormat
+    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    val time_Date = sdf.format(x)
+    time_Date
+  }
+
+  /**
+    * null 转0，计算kafka的offset使用
+    *
+    * @param x
+    * @return
+    */
+  def null2kong(x: Any): String ={
+    if(x == null) return ""
+    else x.toString
+  }
     def toLoclTime(time: String): String ={
         import java.text.SimpleDateFormat
         val format = new SimpleDateFormat("dd/MMM/yyyy:hh:mm:ss Z", Locale.ENGLISH)
